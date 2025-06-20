@@ -1,2 +1,2 @@
 # cdnmariokart
-Mario Kart Tournament Brackets
+Mario Kart Tournament Brackets: https://tanketom.github.io/cdnmariokart/
