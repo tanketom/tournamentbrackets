@@ -1,192 +1,124 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Mario Kart Tournament Bracket</title>
+  <meta charset="UTF-8">
+  <title>Mario Kart Tournament</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f0f0f0;
-      padding: 20px;
-    }
-    h1 {
-      text-align: center;
-    }
-    #playerInput {
-      width: 100%;
-      height: 150px;
-    }
-    #controls {
-      text-align: center;
-      margin: 10px 0;
-    }
-    button {
-      margin: 5px;
-    }
-    #bracketContainer {
-      display: flex;
-      flex-direction: row;
-      overflow-x: auto;
-      transform-origin: top left;
-      transition: transform 0.3s ease;
-    }
-    .round {
-      display: flex;
-      flex-direction: column;
-      margin: 0 20px;
-    }
-    .match {
-      background: #fff;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      margin: 10px 0;
-      padding: 10px;
-      cursor: pointer;
-      transition: transform 0.3s ease;
-    }
-    .player {
-      padding: 5px;
-      margin: 2px 0;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .selected {
-      background-color: #cce5ff;
-    }
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    textarea { width: 100%; height: 200px; }
+    .race { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+    .race h3 { margin-top: 0; }
+    .player { margin: 5px 0; cursor: pointer; padding: 5px; border-radius: 4px; }
+    .selected { background-color: #cfc; }
+    button { margin-top: 10px; padding: 10px 20px; font-size: 16px; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
-  <h1>Mario Kart Tournament Bracket</h1>
-  <textarea id="playerInput" placeholder="Enter 4 to 16 player names, one per line"></textarea><br/>
-  <div id="controls">
-    <button onclick="generateBracket()">Generate Bracket</button>
-    <button onclick="zoomOut()">Zoom Out</button>
-    <button onclick="zoomIn()">Zoom In</button>
-    <button onclick="advancePlayers()">Next</button>
-  </div>
-  <div id="bracketContainer"></div>
 
-  <script>
-    let zoomLevel = 1;
-    let selectedPlayers = [];
-    let mainRounds = [];
-    let bRounds = [];
+<h1>Mario Kart Tournament</h1>
 
-    function generateBracket() {
-      const input = document.getElementById('playerInput').value.trim().split('\n');
-      const players = input.filter(name => name.trim() !== '');
-      if (players.length < 4 || players.length > 16) {
-        alert("Please enter between 4 and 16 players.");
-        return;
-      }
+<div id="inputStage">
+  <p>Enter player names (4–32), one per line:</p>
+  <textarea id="playerInput"></textarea><br>
+  <button onclick="startTournament()">Start Tournament</button>
+</div>
 
-      document.getElementById('bracketContainer').innerHTML = '';
-      mainRounds = [players];
-      bRounds = [];
+<div id="tournamentStage" class="hidden">
+  <h2 id="roundTitle"></h2>
+  <div id="racesContainer"></div>
+  <button onclick="nextRound()">Next Round</button>
+</div>
 
-      createRound(players, 0, 'main');
-    }
+<div id="resultsStage" class="hidden">
+  <h2>🏁 Final Results</h2>
+  <div id="finalResults"></div>
+</div>
 
-    function createRound(players, roundIndex, bracketType) {
-      const bracketContainer = document.getElementById('bracketContainer');
-      const roundDiv = document.createElement('div');
-      roundDiv.className = 'round';
-      roundDiv.dataset.round = roundIndex;
-      roundDiv.dataset.bracket = bracketType;
+<script>
+let allPlayers = [];
+let currentRound = [];
+let bBracket = [];
+let advancing = [];
+let bAdvancing = [];
+let roundNumber = 1;
+let isBFinal = false;
 
-      for (let i = 0; i < players.length; i += 4) {
-        const match = document.createElement('div');
-        match.className = 'match';
-        match.onclick = () => zoomToMatch(match);
+function startTournament() {
+  const input = document.getElementById("playerInput").value.trim().split("\n").map(p => p.trim()).filter(p => p);
+  if (input.length < 4 || input.length > 32 || input.length % 4 !== 0) {
+    alert("Please enter between 4 and 32 player names, in multiples of 4.");
+    return;
+  }
+  allPlayers = input.sort(() => Math.random() - 0.5);
+  currentRound = [...allPlayers];
+  document.getElementById("inputStage").classList.add("hidden");
+  document.getElementById("tournamentStage").classList.remove("hidden");
+  renderRound();
+}
 
-        for (let j = 0; j < 4 && i + j < players.length; j++) {
-          const player = document.createElement('div');
-          player.className = 'player';
-          player.textContent = players[i + j];
-          player.onclick = (e) => {
-            e.stopPropagation();
-            toggleSelect(player);
-          };
-          match.appendChild(player);
+function renderRound() {
+  const container = document.getElementById("racesContainer");
+  container.innerHTML = "";
+  document.getElementById("roundTitle").textContent = isBFinal ? "B Final" : `Round ${roundNumber}`;
+  for (let i = 0; i < currentRound.length; i += 4) {
+    const race = currentRound.slice(i, i + 4);
+    const div = document.createElement("div");
+    div.className = "race";
+    div.innerHTML = `<h3>Race ${i/4 + 1}</h3>`;
+    race.forEach(player => {
+      const p = document.createElement("div");
+      p.className = "player";
+      p.textContent = player;
+      p.onclick = () => {
+        if (p.classList.contains("selected")) {
+          p.classList.remove("selected");
+        } else {
+          const selected = div.querySelectorAll(".selected");
+          if (selected.length < 2) {
+            p.classList.add("selected");
+          }
         }
-        roundDiv.appendChild(match);
-      }
+      };
+      div.appendChild(p);
+    });
+    container.appendChild(div);
+  }
+}
 
-      bracketContainer.appendChild(roundDiv);
+function nextRound() {
+  const races = document.querySelectorAll(".race");
+  const next = [];
+  const bNext = [];
+  for (const race of races) {
+    const players = Array.from(race.querySelectorAll(".player"));
+    const selected = players.filter(p => p.classList.contains("selected"));
+    if (selected.length !== 2) {
+      alert("Please select exactly 2 players from each race.");
+      return;
     }
+    selected.forEach(p => next.push(p.textContent));
+    players.filter(p => !p.classList.contains("selected")).forEach(p => bNext.push(p.textContent));
+  }
 
-    function toggleSelect(playerDiv) {
-      if (playerDiv.classList.contains('selected')) {
-        playerDiv.classList.remove('selected');
-        selectedPlayers = selectedPlayers.filter(p => p !== playerDiv);
-      } else {
-        if (selectedPlayers.length < 2) {
-          playerDiv.classList.add('selected');
-          selectedPlayers.push(playerDiv);
-        }
-      }
+  if (!isBFinal) {
+    advancing = next;
+    bBracket.push(...bNext);
+    if (advancing.length <= 4) {
+      currentRound = advancing;
+      roundNumber++;
+      renderRound();
+      isBFinal = true;
+    } else {
+      currentRound = advancing;
+      roundNumber++;
+      renderRound();
     }
+  } else {
+    bAdvancing = next;
+    showResults();
+  }
+}
 
-    function advancePlayers() {
-      if (selectedPlayers.length !== 2) {
-        alert('Select exactly 2 players to advance.');
-        return;
-      }
-
-      const match = selectedPlayers[0].parentNode;
-      const allPlayers = Array.from(match.children);
-      const bPlayers = allPlayers.filter(p => !selectedPlayers.includes(p));
-
-      const nextMain = selectedPlayers.map(p => p.textContent);
-      const nextB = bPlayers.map(p => p.textContent);
-
-      selectedPlayers.forEach(p => p.classList.remove('selected'));
-      selectedPlayers = [];
-
-      if (!mainRounds.next) mainRounds.next = [];
-      mainRounds.next.push(...nextMain);
-
-      if (!bRounds.next) bRounds.next = [];
-      bRounds.next.push(...nextB);
-
-      const currentRound = match.closest('.round');
-      const matches = currentRound.querySelectorAll('.match');
-      const allProcessed = Array.from(matches).every(m => {
-        const ps = Array.from(m.children);
-        return ps.every(p => !p.classList.contains('selected'));
-      });
-
-      if (allProcessed) {
-        if (mainRounds.next.length > 0) {
-          mainRounds = mainRounds.next;
-          createRound(mainRounds, document.querySelectorAll('.round[data-bracket="main"]').length, 'main');
-        }
-        if (bRounds.next && bRounds.next.length > 0) {
-          bRounds = bRounds.next;
-          createRound(bRounds, document.querySelectorAll('.round[data-bracket="b"]').length, 'b');
-        }
-      }
-    }
-
-    function zoomIn() {
-      zoomLevel += 0.1;
-      document.getElementById('bracketContainer').style.transform = `scale(${zoomLevel})`;
-    }
-
-    function zoomOut() {
-      zoomLevel = Math.max(0.5, zoomLevel - 0.1);
-      document.getElementById('bracketContainer').style.transform = `scale(${zoomLevel})`;
-    }
-
-    function zoomToMatch(match) {
-      const rect = match.getBoundingClientRect();
-      const container = document.getElementById('bracketContainer');
-      const offsetX = rect.left + window.scrollX - container.offsetLeft;
-      const offsetY = rect.top + window.scrollY - container.offsetTop;
-      container.scrollTo({ top: offsetY - 100, left: offsetX - 100, behavior: 'smooth' });
-    }
-  </script>
-</body>
-</html>
+function showResults() {
+  document.getElementById("tournamentStage").classList
