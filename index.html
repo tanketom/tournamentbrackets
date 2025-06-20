@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mario Kart Tournament</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .hidden { display: none; }
+        .bracket { margin-top: 20px; }
+        .match { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Mario Kart Tournament Organizer</h1>
+    <div id="playerCountDiv">
+        <label for="playerCount">Enter number of players (max 16): </label>
+        <input type="number" id="playerCount" min="1" max="16">
+        <button onclick="generatePlayerInputs()">Next</button>
+    </div>
+
+    <div id="playerInputsDiv" class="hidden">
+        <h2>Enter Player Names</h2>
+        <form id="playerForm" onsubmit="startTournament(event)">
+            <div id="playerInputs"></div>
+            <button type="submit">Start Tournament</button>
+        </form>
+    </div>
+
+    <div id="bracketDiv" class="hidden">
+        <h2>Tournament Bracket</h2>
+        <div id="bracket"></div>
+    </div>
+
+    <script>
+        function generatePlayerInputs() {
+            const count = parseInt(document.getElementById('playerCount').value);
+            if (isNaN(count) || count < 1 || count > 16) {
+                alert('Please enter a valid number of players (1-16).');
+                return;
+            }
+
+            const inputsDiv = document.getElementById('playerInputs');
+            inputsDiv.innerHTML = '';
+            for (let i = 0; i < count; i++) {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.name = 'player' + i;
+                input.placeholder = 'Player ' + (i + 1);
+                input.required = true;
+                inputsDiv.appendChild(input);
+                inputsDiv.appendChild(document.createElement('br'));
+            }
+
+            document.getElementById('playerInputsDiv').classList.remove('hidden');
+        }
+
+        function startTournament(event) {
+            event.preventDefault();
+            const form = document.getElementById('playerForm');
+            const formData = new FormData(form);
+            const players = [];
+            for (let value of formData.values()) {
+                players.push(value);
+            }
+
+            document.getElementById('bracketDiv').classList.remove('hidden');
+            runTournament(players);
+        }
+
+        function runTournament(players) {
+            const bracketDiv = document.getElementById('bracket');
+            bracketDiv.innerHTML = '';
+            let round = 1;
+
+            while (players.length > 1) {
+                const nextRound = [];
+                const roundDiv = document.createElement('div');
+                roundDiv.innerHTML = '<h3>Round ' + round + '</h3>';
+
+                for (let i = 0; i < players.length; i += 4) {
+                    const group = players.slice(i, i + 4);
+                    const matchDiv = document.createElement('div');
+                    matchDiv.className = 'match';
+                    matchDiv.innerHTML = 'Match: ' + group.join(', ');
+
+                    // Simulate top 2 advancing (for simplicity, just take first 2)
+                    const winners = group.slice(0, 2);
+                    nextRound.push(...winners);
+
+                    matchDiv.innerHTML += '<br>Winners: ' + winners.join(', ');
+                    roundDiv.appendChild(matchDiv);
+                }
+
+                bracketDiv.appendChild(roundDiv);
+                players = nextRound;
+                round++;
+            }
+
+            if (players.length === 1) {
+                const winnerDiv = document.createElement('div');
+                winnerDiv.innerHTML = '<h3>Champion: ' + players[0] + '</h3>';
+                bracketDiv.appendChild(winnerDiv);
+            }
+        }
+    </script>
+</body>
+</html>
