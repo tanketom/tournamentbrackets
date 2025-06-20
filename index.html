@@ -20,27 +20,31 @@
     }
     #bracketContainer {
       display: flex;
-      flex-wrap: nowrap;
+      flex-direction: row;
+      align-items: flex-start;
       overflow-x: auto;
       transition: transform 0.5s ease;
+      transform-origin: top left;
     }
     .round {
-      margin: 10px;
-      padding: 10px;
-      background: #fff;
-      border-radius: 8px;
-      min-width: 200px;
-      transition: transform 0.5s ease;
+      display: flex;
+      flex-direction: column;
+      margin: 0 20px;
     }
     .match {
-      margin-bottom: 10px;
-      padding: 5px;
+      background: #fff;
       border: 1px solid #ccc;
-      border-radius: 4px;
+      border-radius: 8px;
+      margin: 10px 0;
+      padding: 10px;
+      transition: transform 0.3s ease;
+      cursor: pointer;
     }
     .player {
+      padding: 5px;
+      margin: 2px 0;
+      border-radius: 4px;
       cursor: pointer;
-      padding: 2px 5px;
     }
     .selected {
       background-color: #cce5ff;
@@ -68,27 +72,43 @@
   <script>
     let zoomLevel = 1;
     let selectedPlayers = [];
+    let rounds = [[]]; // rounds[0] is main bracket, rounds[1] is B playoff
 
     function generateBracket() {
       const input = document.getElementById('playerInput').value.trim().split('\n');
       const players = input.filter(name => name.trim() !== '');
       const bracketContainer = document.getElementById('bracketContainer');
       bracketContainer.innerHTML = '';
-      const round = document.createElement('div');
-      round.className = 'round';
+      rounds = [[...players], []];
+
+      createRound(players, 0);
+    }
+
+    function createRound(players, roundIndex) {
+      const bracketContainer = document.getElementById('bracketContainer');
+      const roundDiv = document.createElement('div');
+      roundDiv.className = 'round';
+      roundDiv.dataset.round = roundIndex;
+
       for (let i = 0; i < players.length; i += 4) {
         const match = document.createElement('div');
         match.className = 'match';
+        match.onclick = () => zoomToMatch(match);
+
         for (let j = 0; j < 4 && i + j < players.length; j++) {
           const player = document.createElement('div');
           player.className = 'player';
           player.textContent = players[i + j];
-          player.onclick = () => toggleSelect(player);
+          player.onclick = (e) => {
+            e.stopPropagation();
+            toggleSelect(player);
+          };
           match.appendChild(player);
         }
-        round.appendChild(match);
+        roundDiv.appendChild(match);
       }
-      bracketContainer.appendChild(round);
+
+      bracketContainer.appendChild(roundDiv);
     }
 
     function toggleSelect(playerDiv) {
@@ -108,41 +128,40 @@
         alert('Select exactly 2 players to advance.');
         return;
       }
-      const nextRound = document.createElement('div');
-      nextRound.className = 'round';
-      const match = document.createElement('div');
-      match.className = 'match';
-      selectedPlayers.forEach(player => {
-        const newPlayer = document.createElement('div');
-        newPlayer.className = 'player';
-        newPlayer.textContent = player.textContent;
-        newPlayer.onclick = () => toggleSelect(newPlayer);
-        match.appendChild(newPlayer);
-      });
-      nextRound.appendChild(match);
-      document.getElementById('bracketContainer').appendChild(nextRound);
 
-      // B playoff
-      const bMatch = document.createElement('div');
-      bMatch.className = 'match';
-      const allPlayers = Array.from(selectedPlayers[0].parentNode.children);
+      const match = selectedPlayers[0].parentNode;
+      const allPlayers = Array.from(match.children);
       const bPlayers = allPlayers.filter(p => !selectedPlayers.includes(p));
-      bPlayers.forEach(player => {
-        const newPlayer = document.createElement('div');
-        newPlayer.className = 'player';
-        newPlayer.textContent = player.textContent;
-        newPlayer.onclick = () => toggleSelect(newPlayer);
-        bMatch.appendChild(newPlayer);
-      });
-      if (bPlayers.length > 0) {
-        const bRound = document.createElement('div');
-        bRound.className = 'round';
-        bRound.appendChild(bMatch);
-        document.getElementById('bracketContainer').appendChild(bRound);
-      }
+
+      const nextRoundPlayers = selectedPlayers.map(p => p.textContent);
+      const bRoundPlayers = bPlayers.map(p => p.textContent);
 
       selectedPlayers.forEach(p => p.classList.remove('selected'));
       selectedPlayers = [];
+
+      if (!rounds[0].next) rounds[0].next = [];
+      rounds[0].next.push(...nextRoundPlayers);
+
+      if (!rounds[1].next) rounds[1].next = [];
+      rounds[1].next.push(...bRoundPlayers);
+
+      const currentRound = match.closest('.round');
+      const matches = currentRound.querySelectorAll('.match');
+      const allProcessed = Array.from(matches).every(m => {
+        const ps = Array.from(m.children);
+        return ps.every(p => !p.classList.contains('selected'));
+      });
+
+      if (allProcessed) {
+        if (rounds[0].next.length > 0) {
+          createRound(rounds[0].next, 0);
+          rounds[0] = rounds[0].next;
+        }
+        if (rounds[1].next && rounds[1].next.length > 0) {
+          createRound(rounds[1].next, 1);
+          rounds[1] = rounds[1].next;
+        }
+      }
     }
 
     function zoomIn() {
@@ -153,6 +172,14 @@
     function zoomOut() {
       zoomLevel = Math.max(0.5, zoomLevel - 0.1);
       document.getElementById('bracketContainer').style.transform = `scale(${zoomLevel})`;
+    }
+
+    function zoomToMatch(match) {
+      const rect = match.getBoundingClientRect();
+      const container = document.getElementById('bracketContainer');
+      const offsetX = rect.left + window.scrollX - container.offsetLeft;
+      const offsetY = rect.top + window.scrollY - container.offsetTop;
+      container.scrollTo({ top: offsetY - 100, left: offsetX - 100, behavior: 'smooth' });
     }
   </script>
 </body>
