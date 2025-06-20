@@ -1,15 +1,15 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>CDN Mario Kart Tournament Bracket</title>
+  <title>Mario Kart Tournament Bracket</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
       background: #f0f0f0;
+      padding: 20px;
     }
     h1 {
       text-align: center;
@@ -18,13 +18,19 @@
       width: 100%;
       height: 150px;
     }
+    #controls {
+      text-align: center;
+      margin: 10px 0;
+    }
+    button {
+      margin: 5px;
+    }
     #bracketContainer {
       display: flex;
       flex-direction: row;
-      align-items: flex-start;
       overflow-x: auto;
-      transition: transform 0.5s ease;
       transform-origin: top left;
+      transition: transform 0.3s ease;
     }
     .round {
       display: flex;
@@ -37,8 +43,8 @@
       border-radius: 8px;
       margin: 10px 0;
       padding: 10px;
-      transition: transform 0.3s ease;
       cursor: pointer;
+      transition: transform 0.3s ease;
     }
     .player {
       padding: 5px;
@@ -49,20 +55,13 @@
     .selected {
       background-color: #cce5ff;
     }
-    #controls {
-      margin: 10px 0;
-      text-align: center;
-    }
-    button {
-      margin: 5px;
-    }
   </style>
 </head>
 <body>
-  <h1>CDN Mario Kart Tournament Bracket</h1>
-  <textarea id="playerInput" placeholder="Enter player names, one per line"></textarea><br/>
-  <button onclick="generateBracket()">Generate Bracket</button>
+  <h1>Mario Kart Tournament Bracket</h1>
+  <textarea id="playerInput" placeholder="Enter 4 to 16 player names, one per line"></textarea><br/>
   <div id="controls">
+    <button onclick="generateBracket()">Generate Bracket</button>
     <button onclick="zoomOut()">Zoom Out</button>
     <button onclick="zoomIn()">Zoom In</button>
     <button onclick="advancePlayers()">Next</button>
@@ -72,23 +71,30 @@
   <script>
     let zoomLevel = 1;
     let selectedPlayers = [];
-    let rounds = [[]]; // rounds[0] is main bracket, rounds[1] is B playoff
+    let mainRounds = [];
+    let bRounds = [];
 
     function generateBracket() {
       const input = document.getElementById('playerInput').value.trim().split('\n');
       const players = input.filter(name => name.trim() !== '');
-      const bracketContainer = document.getElementById('bracketContainer');
-      bracketContainer.innerHTML = '';
-      rounds = [[...players], []];
+      if (players.length < 4 || players.length > 16) {
+        alert("Please enter between 4 and 16 players.");
+        return;
+      }
 
-      createRound(players, 0);
+      document.getElementById('bracketContainer').innerHTML = '';
+      mainRounds = [players];
+      bRounds = [];
+
+      createRound(players, 0, 'main');
     }
 
-    function createRound(players, roundIndex) {
+    function createRound(players, roundIndex, bracketType) {
       const bracketContainer = document.getElementById('bracketContainer');
       const roundDiv = document.createElement('div');
       roundDiv.className = 'round';
       roundDiv.dataset.round = roundIndex;
+      roundDiv.dataset.bracket = bracketType;
 
       for (let i = 0; i < players.length; i += 4) {
         const match = document.createElement('div');
@@ -133,17 +139,17 @@
       const allPlayers = Array.from(match.children);
       const bPlayers = allPlayers.filter(p => !selectedPlayers.includes(p));
 
-      const nextRoundPlayers = selectedPlayers.map(p => p.textContent);
-      const bRoundPlayers = bPlayers.map(p => p.textContent);
+      const nextMain = selectedPlayers.map(p => p.textContent);
+      const nextB = bPlayers.map(p => p.textContent);
 
       selectedPlayers.forEach(p => p.classList.remove('selected'));
       selectedPlayers = [];
 
-      if (!rounds[0].next) rounds[0].next = [];
-      rounds[0].next.push(...nextRoundPlayers);
+      if (!mainRounds.next) mainRounds.next = [];
+      mainRounds.next.push(...nextMain);
 
-      if (!rounds[1].next) rounds[1].next = [];
-      rounds[1].next.push(...bRoundPlayers);
+      if (!bRounds.next) bRounds.next = [];
+      bRounds.next.push(...nextB);
 
       const currentRound = match.closest('.round');
       const matches = currentRound.querySelectorAll('.match');
@@ -153,13 +159,13 @@
       });
 
       if (allProcessed) {
-        if (rounds[0].next.length > 0) {
-          createRound(rounds[0].next, 0);
-          rounds[0] = rounds[0].next;
+        if (mainRounds.next.length > 0) {
+          mainRounds = mainRounds.next;
+          createRound(mainRounds, document.querySelectorAll('.round[data-bracket="main"]').length, 'main');
         }
-        if (rounds[1].next && rounds[1].next.length > 0) {
-          createRound(rounds[1].next, 1);
-          rounds[1] = rounds[1].next;
+        if (bRounds.next && bRounds.next.length > 0) {
+          bRounds = bRounds.next;
+          createRound(bRounds, document.querySelectorAll('.round[data-bracket="b"]').length, 'b');
         }
       }
     }
