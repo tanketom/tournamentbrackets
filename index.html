@@ -1,106 +1,216 @@
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Mario Kart Tournament</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .hidden { display: none; }
-        .bracket { margin-top: 20px; }
-        .match { margin-bottom: 10px; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CDN Open</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #1e3c72, #2a5298);
+      color: white;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    h1 {
+      text-align: center;
+      margin-top: 30px;
+      font-size: 3em;
+      text-shadow: 2px 2px #000;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      padding: 20px;
+      text-align: center;
+      transition: opacity 0.5s ease-in-out;
+    }
+    .hidden {
+      opacity: 0;
+      pointer-events: none;
+      position: absolute;
+    }
+    input[type="number"], input[type="text"], select {
+      padding: 10px;
+      margin: 10px;
+      font-size: 1em;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1em;
+      margin-top: 20px;
+      cursor: pointer;
+      background-color: #ffcc00;
+      border: none;
+      border-radius: 5px;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #ffaa00;
+    }
+    .bracket {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 30px;
+    }
+    .match {
+      border: 2px solid white;
+      border-radius: 10px;
+      padding: 10px;
+      margin: 10px;
+      width: 200px;
+      background-color: rgba(255,255,255,0.1);
+      position: relative;
+      animation: fadeIn 1s ease-in-out;
+    }
+    .match img {
+      width: 24px;
+      vertical-align: middle;
+      margin-right: 5px;
+    }
+    .line {
+      width: 2px;
+      height: 40px;
+      background: white;
+      margin: auto;
+      animation: growLine 1s ease-in-out forwards;
+    }
+    @keyframes growLine {
+      from { height: 0; }
+      to { height: 40px; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
 </head>
 <body>
-    <h1>Mario Kart Tournament Organizer</h1>
-    <div id="playerCountDiv">
-        <label for="playerCount">Enter number of players (max 16): </label>
-        <input type="number" id="playerCount" min="1" max="16">
-        <button onclick="generatePlayerInputs()">Next</button>
-    </div>
+  <h1>CDN Open</h1>
+  <div class="container" id="step1">
+    <h2>Enter number of players (max 16):</h2>
+    <input type="number" id="playerCount" min="4" max="16" step="4" />
+    <br/>
+    <button onclick="goToStep2()">Next</button>
+  </div>
 
-    <div id="playerInputsDiv" class="hidden">
-        <h2>Enter Player Names</h2>
-        <form id="playerForm" onsubmit="startTournament(event)">
-            <div id="playerInputs"></div>
-            <button type="submit">Start Tournament</button>
-        </form>
-    </div>
+  <div class="container hidden" id="step2">
+    <h2>Enter player names:</h2>
+    <div id="playerInputs"></div>
+    <button onclick="startTournament()">Start Tournament</button>
+  </div>
 
-    <div id="bracketDiv" class="hidden">
-        <h2>Tournament Bracket</h2>
-        <div id="bracket"></div>
-    </div>
+  <div class="container hidden" id="bracketContainer">
+    <h2>Tournament Bracket</h2>
+    <div id="bracket" class="bracket"></div>
+  </div>
 
-    <script>
-        function generatePlayerInputs() {
-            const count = parseInt(document.getElementById('playerCount').value);
-            if (isNaN(count) || count < 1 || count > 16) {
-                alert('Please enter a valid number of players (1-16).');
-                return;
-            }
+  <script>
+    let players = [];
 
-            const inputsDiv = document.getElementById('playerInputs');
-            inputsDiv.innerHTML = '';
-            for (let i = 0; i < count; i++) {
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.name = 'player' + i;
-                input.placeholder = 'Player ' + (i + 1);
-                input.required = true;
-                inputsDiv.appendChild(input);
-                inputsDiv.appendChild(document.createElement('br'));
-            }
+    function goToStep2() {
+      const count = parseInt(document.getElementById('playerCount').value);
+      if (isNaN(count) || count < 4 || count > 16 || count % 4 !== 0) {
+        alert("Please enter a valid number (4, 8, 12, or 16)");
+        return;
+      }
+      const inputDiv = document.getElementById('playerInputs');
+      inputDiv.innerHTML = '';
+      for (let i = 0; i < count; i++) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Player ' + (i + 1);
+        input.id = 'player' + i;
+        inputDiv.appendChild(input);
+        inputDiv.appendChild(document.createElement('br'));
+      }
+      transition('step1', 'step2');
+    }
 
-            document.getElementById('playerInputsDiv').classList.remove('hidden');
+    function startTournament() {
+      players = [];
+      const count = parseInt(document.getElementById('playerCount').value);
+      for (let i = 0; i < count; i++) {
+        const name = document.getElementById('player' + i).value.trim();
+        if (!name) {
+          alert("Please fill in all player names.");
+          return;
         }
+        players.push(name);
+      }
+      transition('step2', 'bracketContainer');
+      renderBracket(players);
+    }
 
-        function startTournament(event) {
-            event.preventDefault();
-            const form = document.getElementById('playerForm');
-            const formData = new FormData(form);
-            const players = [];
-            for (let value of formData.values()) {
-                players.push(value);
+    function renderBracket(currentPlayers) {
+      const bracketDiv = document.getElementById('bracket');
+      bracketDiv.innerHTML = '';
+      let round = 1;
+      let advancing = currentPlayers;
+
+      function createRound(playersList, roundNum) {
+        const nextRound = [];
+        for (let i = 0; i < playersList.length; i += 4) {
+          const matchDiv = document.createElement('div');
+          matchDiv.className = 'match';
+          matchDiv.innerHTML = `<strong>Round ${roundNum} Match</strong><br/>`;
+
+          const group = playersList.slice(i, i + 4);
+          const select1 = document.createElement('select');
+          const select2 = document.createElement('select');
+          select1.innerHTML = '<option disabled selected>Top 1</option>';
+          select2.innerHTML = '<option disabled selected>Top 2</option>';
+
+          group.forEach(p => {
+            const icon = '<img src="https://img.icons8.com/color/48/mario.png" alt="icon"/>';
+            matchDiv.innerHTML += icon + p + '<br/>';
+            select1.innerHTML += `<option value="${p}">${p}</option>`;
+            select2.innerHTML += `<option value="${p}">${p}</option>`;
+          });
+
+          matchDiv.appendChild(select1);
+          matchDiv.appendChild(select2);
+
+          const confirmBtn = document.createElement('button');
+          confirmBtn.textContent = 'Confirm Winners';
+          confirmBtn.onclick = () => {
+            const winner1 = select1.value;
+            const winner2 = select2.value;
+            if (!winner1 || !winner2 || winner1 === winner2) {
+              alert("Select two different winners.");
+              return;
             }
-
-            document.getElementById('bracketDiv').classList.remove('hidden');
-            runTournament(players);
+            nextRound.push(winner1, winner2);
+            confirmBtn.disabled = true;
+            if (nextRound.length === Math.floor(playersList.length / 2)) {
+              const line = document.createElement('div');
+              line.className = 'line';
+              bracketDiv.appendChild(line);
+              setTimeout(() => {
+                createRound(nextRound, roundNum + 1);
+              }, 1000);
+            }
+          };
+          matchDiv.appendChild(confirmBtn);
+          bracketDiv.appendChild(matchDiv);
         }
+      }
 
-        function runTournament(players) {
-            const bracketDiv = document.getElementById('bracket');
-            bracketDiv.innerHTML = '';
-            let round = 1;
+      createRound(advancing, round);
+    }
 
-            while (players.length > 1) {
-                const nextRound = [];
-                const roundDiv = document.createElement('div');
-                roundDiv.innerHTML = '<h3>Round ' + round + '</h3>';
-
-                for (let i = 0; i < players.length; i += 4) {
-                    const group = players.slice(i, i + 4);
-                    const matchDiv = document.createElement('div');
-                    matchDiv.className = 'match';
-                    matchDiv.innerHTML = 'Match: ' + group.join(', ');
-
-                    // Simulate top 2 advancing (for simplicity, just take first 2)
-                    const winners = group.slice(0, 2);
-                    nextRound.push(...winners);
-
-                    matchDiv.innerHTML += '<br>Winners: ' + winners.join(', ');
-                    roundDiv.appendChild(matchDiv);
-                }
-
-                bracketDiv.appendChild(roundDiv);
-                players = nextRound;
-                round++;
-            }
-
-            if (players.length === 1) {
-                const winnerDiv = document.createElement('div');
-                winnerDiv.innerHTML = '<h3>Champion: ' + players[0] + '</h3>';
-                bracketDiv.appendChild(winnerDiv);
-            }
-        }
-    </script>
+    function transition(hideId, showId) {
+      document.getElementById(hideId).classList.add('hidden');
+      setTimeout(() => {
+        document.getElementById(hideId).style.display = 'none';
+        const showEl = document.getElementById(showId);
+        showEl.style.display = 'block';
+        setTimeout(() => showEl.classList.remove('hidden'), 50);
+      }, 500);
+    }
+  </script>
 </body>
 </html>
