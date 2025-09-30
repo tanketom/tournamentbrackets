@@ -947,7 +947,11 @@
 
                     if (tournamentData.type === 'single') {
                         const parts = matchId.split('-');
-                        advanceSingle(winner, loser, parseInt(parts[0]), parseInt(parts[1]));
+                        if (parts[0] === '3rd') {
+                            // This is the 3rd place match. We just record the winner and stop.
+                        } else {
+                            advanceSingle(winner, loser, parseInt(parts[0]), parseInt(parts[1]));
+                        }
                     } else if (tournamentData.type === 'double') {
                         const parts = matchId.split('-');
                         advanceDouble(winner, loser, parts[0], parseInt(parts[1]), parseInt(parts[2]));
