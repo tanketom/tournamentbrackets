@@ -1,124 +1,1260 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Mario Kart Tournament</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    textarea { width: 100%; height: 200px; }
-    .race { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
-    .race h3 { margin-top: 0; }
-    .player { margin: 5px 0; cursor: pointer; padding: 5px; border-radius: 4px; }
-    .selected { background-color: #cfc; }
-    button { margin-top: 10px; padding: 10px 20px; font-size: 16px; }
-    .hidden { display: none; }
-  </style>
-</head>
-<body>
-
-<h1>Mario Kart Tournament</h1>
-
-<div id="inputStage">
-  <p>Enter player names (4–32), one per line:</p>
-  <textarea id="playerInput"></textarea><br>
-  <button onclick="startTournament()">Start Tournament</button>
-</div>
-
-<div id="tournamentStage" class="hidden">
-  <h2 id="roundTitle"></h2>
-  <div id="racesContainer"></div>
-  <button onclick="nextRound()">Next Round</button>
-</div>
-
-<div id="resultsStage" class="hidden">
-  <h2>🏁 Final Results</h2>
-  <div id="finalResults"></div>
-</div>
-
-<script>
-let allPlayers = [];
-let currentRound = [];
-let bBracket = [];
-let advancing = [];
-let bAdvancing = [];
-let roundNumber = 1;
-let isBFinal = false;
-
-function startTournament() {
-  const input = document.getElementById("playerInput").value.trim().split("\n").map(p => p.trim()).filter(p => p);
-  if (input.length < 4 || input.length > 32 || input.length % 4 !== 0) {
-    alert("Please enter between 4 and 32 player names, in multiples of 4.");
-    return;
-  }
-  allPlayers = input.sort(() => Math.random() - 0.5);
-  currentRound = [...allPlayers];
-  document.getElementById("inputStage").classList.add("hidden");
-  document.getElementById("tournamentStage").classList.remove("hidden");
-  renderRound();
-}
-
-function renderRound() {
-  const container = document.getElementById("racesContainer");
-  container.innerHTML = "";
-  document.getElementById("roundTitle").textContent = isBFinal ? "B Final" : `Round ${roundNumber}`;
-  for (let i = 0; i < currentRound.length; i += 4) {
-    const race = currentRound.slice(i, i + 4);
-    const div = document.createElement("div");
-    div.className = "race";
-    div.innerHTML = `<h3>Race ${i/4 + 1}</h3>`;
-    race.forEach(player => {
-      const p = document.createElement("div");
-      p.className = "player";
-      p.textContent = player;
-      p.onclick = () => {
-        if (p.classList.contains("selected")) {
-          p.classList.remove("selected");
-        } else {
-          const selected = div.querySelectorAll(".selected");
-          if (selected.length < 2) {
-            p.classList.add("selected");
-          }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Office Tournament Bracket Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* Dark gray background */
+            color: #f3f4f6;
         }
-      };
-      div.appendChild(p);
-    });
-    container.appendChild(div);
-  }
-}
+        /* Styles for the bracket lines */
+        .matchup-connector {
+            position: relative;
+        }
+        .matchup-connector::after {
+            content: '';
+            position: absolute;
+            width: 1px;
+            background-color: #4b5563; /* Gray connector line */
+            top: 50%;
+            left: 100%;
+            height: 100%;
+            transform: translateY(-50%);
+        }
+        .round .matchup:nth-child(odd) .matchup-connector::after {
+           height: calc(100% + 4.5rem + 1px); 
+        }
+         .round .matchup:nth-child(even) .matchup-connector::after {
+           transform: translateY(-150%);
+        }
+        .connector-line {
+            width: 50%;
+            height: 1px;
+            background-color: #4b5563;
+            position: absolute;
+            left: 100%;
+            top: 50%;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+        /* Confetti styles */
+        .confetti {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: fall 1s ease-out forwards;
+            pointer-events: none;
+        }
+        @keyframes fall {
+            0% { transform: translateY(0) rotateZ(0deg); opacity: 1; }
+            100% { transform: translateY(100px) rotateZ(360deg); opacity: 0; }
+        }
+        /* Victory Screen Animation */
+        #victory-screen {
+            background: radial-gradient(circle, #2a475e 0%, #1b2838 100%);
+            animation: fadeIn 1s ease-in-out;
+        }
+        .trophy {
+            animation: popIn 0.5s ease-out, float 3s ease-in-out infinite 0.5s;
+        }
+        #victory-rankings-container {
+            opacity: 0;
+            transition: opacity 1s ease-in-out 0.5s;
+        }
+        .scrolling-list {
+            animation: scrollList 20s linear infinite;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes popIn {
+            from { transform: scale(0.5); }
+            to { transform: scale(1); }
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        @keyframes scrollList {
+            0%, 15% { transform: translateY(0%); }
+            50% { transform: translateY(calc(-100% + 300px)); } /* 300px is the container height */
+            65%, 100% { transform: translateY(0%); }
+        }
+    </style>
+</head>
+<body class="antialiased">
 
-function nextRound() {
-  const races = document.querySelectorAll(".race");
-  const next = [];
-  const bNext = [];
-  for (const race of races) {
-    const players = Array.from(race.querySelectorAll(".player"));
-    const selected = players.filter(p => p.classList.contains("selected"));
-    if (selected.length !== 2) {
-      alert("Please select exactly 2 players from each race.");
-      return;
-    }
-    selected.forEach(p => next.push(p.textContent));
-    players.filter(p => !p.classList.contains("selected")).forEach(p => bNext.push(p.textContent));
-  }
+    <!-- Main Container -->
+    <div id="app" class="min-h-screen p-4 sm:p-6 lg:p-8 transition-opacity duration-500">
+        
+        <!-- Setup Screen -->
+        <div id="setup-screen">
+            <div class="max-w-4xl mx-auto bg-gray-900/50 backdrop-blur-sm rounded-2xl shadow-lg p-8">
+                <div class="text-center mb-8">
+                    <h1 class="text-4xl font-extrabold text-white tracking-tight">Tournament Setup</h1>
+                    <div class="mt-4">
+                        <input type="text" id="tournament-name-input" placeholder="Name Your Tournament (e.g., 'Office Ping Pong Cup')" class="w-full max-w-lg bg-gray-700 text-white placeholder-gray-400 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center">
+                    </div>
+                </div>
 
-  if (!isBFinal) {
-    advancing = next;
-    bBracket.push(...bNext);
-    if (advancing.length <= 4) {
-      currentRound = advancing;
-      roundNumber++;
-      renderRound();
-      isBFinal = true;
-    } else {
-      currentRound = advancing;
-      roundNumber++;
-      renderRound();
-    }
-  } else {
-    bAdvancing = next;
-    showResults();
-  }
-}
+                <!-- Participant Input -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white mb-4">1. Add & Edit Participants</h2>
+                        <div class="space-y-4">
+                            <div class="flex flex-col sm:flex-row gap-3">
+                                <input type="text" id="participant-name" placeholder="Participant's Name" class="flex-grow bg-gray-700 text-white placeholder-gray-400 border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <input type="color" id="participant-color" value="#3b82f6" class="w-full sm:w-auto h-10 rounded-lg cursor-pointer bg-gray-700 border border-gray-600">
+                            </div>
+                             <div id="add-edit-buttons" class="flex gap-3">
+                                <button id="add-participant" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Add Participant</button>
+                             </div>
+                        </div>
+                        <div id="participants-list" class="mt-6 space-y-2 max-h-48 overflow-y-auto pr-2">
+                            <!-- Participants will be listed here -->
+                        </div>
+                    </div>
 
-function showResults() {
-  document.getElementById("tournamentStage").classList
+                    <!-- Tournament Options -->
+                    <div>
+                        <h2 class="text-2xl font-bold text-white mb-4">2. Choose Format</h2>
+                        <div id="tournament-type" class="space-y-3">
+                            <label class="flex items-center p-4 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition">
+                                <input type="radio" name="tournament" value="single" class="form-radio h-5 w-5 text-blue-600 bg-gray-700 border-gray-600" checked>
+                                <span class="ml-4 text-white">
+                                    <span class="font-bold block">Single Elimination</span>
+                                    <span class="text-sm text-gray-400">Win or go home. Fast and exciting.</span>
+                                </span>
+                            </label>
+                            <label class="flex items-center p-4 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition">
+                                <input type="radio" name="tournament" value="double" class="form-radio h-5 w-5 text-blue-600 bg-gray-700 border-gray-600">
+                                <span class="ml-4 text-white">
+                                    <span class="font-bold block">Double Elimination</span>
+                                    <span class="text-sm text-gray-400">A second chance in the "B" bracket.</span>
+                                </span>
+                            </label>
+                            <label class="flex items-center p-4 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition">
+                                <input type="radio" name="tournament" value="round-robin" class="form-radio h-5 w-5 text-blue-600 bg-gray-700 border-gray-600">
+                                <span class="ml-4 text-white">
+                                    <span class="font-bold block">Round Robin</span>
+                                    <span class="text-sm text-gray-400">Everyone plays everyone.</span>
+                                </span>
+                            </label>
+                            <label class="flex items-center p-4 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition">
+                                <input type="radio" name="tournament" value="mario-kart" class="form-radio h-5 w-5 text-red-500 bg-gray-700 border-gray-600">
+                                <span class="ml-4 text-white flex-grow">
+                                    <span class="font-bold block">Mario Kart GP</span>
+                                    <span class="text-sm text-gray-400">Points-based over several rounds.</span>
+                                </span>
+                                <div id="mario-kart-rounds-container" class="hidden flex items-center gap-2">
+                                    <input type="number" id="mario-kart-rounds" value="1" min="1" class="w-16 bg-gray-700 text-white border border-gray-600 rounded-lg px-2 py-1 text-center">
+                                    <span class="text-sm text-gray-300">Rounds</span>
+                                </div>
+                            </label>
+                        </div>
+                         <div class="mt-4 space-y-2">
+                            <label class="flex items-center justify-center p-3 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition">
+                                <input type="checkbox" id="enable-scoring" class="form-checkbox h-5 w-5 text-green-500 bg-gray-700 border-gray-600 rounded">
+                                <span class="ml-3 text-white font-semibold">Include Scoring? (e.g., 2-1)</span>
+                            </label>
+                            <label id="third-place-option" class="flex items-center justify-center p-3 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition">
+                                <input type="checkbox" id="third-place-match" class="form-checkbox h-5 w-5 text-purple-500 bg-gray-700 border-gray-600 rounded">
+                                <span class="ml-3 text-white font-semibold">Include match for 3rd place?</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generate/Load Buttons -->
+                <div class="mt-10 text-center flex justify-center items-center gap-4">
+                    <button id="generate-bracket" class="bg-green-600 hover:bg-green-700 text-white font-extrabold py-4 px-10 rounded-xl text-lg transition transform hover:scale-105 duration-300 shadow-lg">Generate Tournament</button>
+                    <button id="load-tournament" class="hidden bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition">Load Saved</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tournament View -->
+        <div id="tournament-view" class="hidden">
+            <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                <h1 id="tournament-title" class="text-3xl font-bold text-white">Tournament Bracket</h1>
+                <div class="flex gap-2">
+                    <button id="save-progress" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition">Save Progress</button>
+                    <button id="export-image" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition">Export as Image</button>
+                    <button id="reset-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition">New Tournament</button>
+                </div>
+            </div>
+            <div id="bracket-container" class="w-full overflow-x-auto pb-4 bg-gray-900/30 p-4 rounded-lg">
+                <!-- Bracket will be rendered here -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Victory Screen -->
+    <div id="victory-screen" class="hidden fixed inset-0 z-50 flex flex-col items-center justify-center text-center p-4 overflow-hidden">
+        <div id="victory-main-content">
+            <div class="trophy">
+                <svg class="w-32 h-32 md:w-48 md:h-48 text-yellow-400 drop-shadow-lg" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M11.25 2.25a.75.75 0 00-1.5 0v1.519A4.496 4.496 0 006 7.577V6.75a.75.75 0 00-1.5 0v.827a4.5 4.5 0 00-1.5 3.32v1.586a4.5 4.5 0 001.5 3.32v.827a.75.75 0 001.5 0v-.827a4.5 4.5 0 004.5-3.32V11.25a.75.75 0 00-1.5 0v.827a3 3 0 01-3 2.68v-1.586a3 3 0 013-2.68V7.577a3 3 0 013 2.68v1.586a3 3 0 01-3 2.68v.827a.75.75 0 001.5 0v-.827a4.5 4.5 0 001.5-3.32V10.897a4.5 4.5 0 00-1.5-3.32V6.75a.75.75 0 00-1.5 0v.827a4.496 4.496 0 00-4.5-3.32V2.25z" clip-rule="evenodd" /><path d="M6 15h8v.75a.75.75 0 01-1.5 0V15H7.5v.75a.75.75 0 01-1.5 0V15z" /></svg>
+            </div>
+            <p id="victory-tournament-name" class="text-xl md:text-2xl text-gray-200 mt-4"></p>
+            <h1 id="winner-name" class="text-5xl md:text-8xl font-black text-yellow-300 my-2 drop-shadow-xl" style="font-family: 'Inter', sans-serif;"></h1>
+            <p class="text-xl md:text-2xl text-gray-200">is the tournament champion!</p>
+            <div id="victory-buttons" class="flex gap-4">
+                <button id="new-tournament-from-victory" class="mt-8 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition transform hover:scale-105 duration-300">New Tournament</button>
+                <button id="export-final-results" class="mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition transform hover:scale-105 duration-300">Export Results</button>
+            </div>
+        </div>
+        <div id="victory-rankings-container" class="absolute inset-x-0 bottom-0 top-0 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div id="rankings-export-area" class="h-[300px] w-full max-w-md overflow-hidden relative bg-gray-900/50 rounded-lg p-2">
+                 <div id="victory-rankings-list" class="absolute inset-x-0 top-0">
+                    <!-- Rankings will be injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Score Input Modal -->
+    <div id="score-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="bg-gray-800 rounded-xl shadow-lg p-8 w-full max-w-sm">
+            <h2 class="text-2xl font-bold text-center mb-6">Enter Match Score</h2>
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <label id="modal-p1-name" for="p1-score" class="text-lg font-semibold text-white"></label>
+                    <input type="number" id="p1-score" min="0" class="w-20 bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-center focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="flex items-center justify-between">
+                    <label id="modal-p2-name" for="p2-score" class="text-lg font-semibold text-white"></label>
+                    <input type="number" id="p2-score" min="0" class="w-20 bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-center focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+            <div class="mt-8 flex gap-4">
+                <button id="modal-cancel" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition">Cancel</button>
+                <button id="modal-confirm" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition">Confirm Winner</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mario Kart Rank Input Modal -->
+    <div id="mario-kart-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div class="bg-gray-800 rounded-xl shadow-lg p-8 w-full max-w-md">
+            <h2 id="mario-kart-modal-title" class="text-2xl font-bold text-center mb-6">Enter Ranks for Round 1</h2>
+            <div id="mario-kart-rank-list" class="space-y-3 max-h-80 overflow-y-auto pr-2">
+                <!-- Player rank inputs will be injected here -->
+            </div>
+             <p id="mario-kart-modal-error" class="text-red-400 text-center text-sm mt-4 h-4"></p>
+            <div class="mt-4 flex gap-4">
+                <button id="mk-modal-cancel" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition">Cancel</button>
+                <button id="mk-modal-confirm" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition">Confirm Ranks</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- STATE MANAGEMENT ---
+            let participants = [];
+            let tournamentData = {};
+            let scoringEnabled = false;
+            let currentMatchIdForModal = null;
+            let editingParticipantId = null;
+            const availableColors = ['#f43f5e', '#ec4899', '#d946ef', '#a855f7', '#8b5cf6', '#6366f1', '#3b82f6', '#0ea5e9', '#06b6d4', '#14b8a6', '#10b981', '#22c55e', '#84cc16', '#eab308', '#f59e0b', '#f97316'];
+
+            // --- DOM ELEMENTS ---
+            const app = document.getElementById('app');
+            const setupScreen = document.getElementById('setup-screen');
+            const tournamentView = document.getElementById('tournament-view');
+            const tournamentNameInput = document.getElementById('tournament-name-input');
+            const addParticipantBtn = document.getElementById('add-participant');
+            const participantNameInput = document.getElementById('participant-name');
+            const participantColorInput = document.getElementById('participant-color');
+            const participantsListDiv = document.getElementById('participants-list');
+            const generateBracketBtn = document.getElementById('generate-bracket');
+            const loadTournamentBtn = document.getElementById('load-tournament');
+            const bracketContainer = document.getElementById('bracket-container');
+            const tournamentTitle = document.getElementById('tournament-title');
+            const resetButton = document.getElementById('reset-button');
+            const saveProgressBtn = document.getElementById('save-progress');
+            const exportImageBtn = document.getElementById('export-image');
+            const victoryScreen = document.getElementById('victory-screen');
+            const winnerNameEl = document.getElementById('winner-name');
+            const victoryTournamentNameEl = document.getElementById('victory-tournament-name');
+            const newTournamentBtn = document.getElementById('new-tournament-from-victory');
+            const exportFinalResultsBtn = document.getElementById('export-final-results');
+            const victoryMainContent = document.getElementById('victory-main-content');
+            const victoryRankingsContainer = document.getElementById('victory-rankings-container');
+            const victoryRankingsList = document.getElementById('victory-rankings-list');
+            const enableScoringCheckbox = document.getElementById('enable-scoring');
+            const thirdPlaceOption = document.getElementById('third-place-option');
+            const thirdPlaceCheckbox = document.getElementById('third-place-match');
+            const tournamentTypeRadios = document.querySelectorAll('input[name="tournament"]');
+            const marioKartRoundsContainer = document.getElementById('mario-kart-rounds-container');
+            const marioKartRoundsInput = document.getElementById('mario-kart-rounds');
+            const scoreModal = document.getElementById('score-modal');
+            const modalP1Name = document.getElementById('modal-p1-name');
+            const modalP2Name = document.getElementById('modal-p2-name');
+            const p1ScoreInput = document.getElementById('p1-score');
+            const p2ScoreInput = document.getElementById('p2-score');
+            const modalCancelBtn = document.getElementById('modal-cancel');
+            const modalConfirmBtn = document.getElementById('modal-confirm');
+            const marioKartModal = document.getElementById('mario-kart-modal');
+            const marioKartModalTitle = document.getElementById('mario-kart-modal-title');
+            const marioKartRankList = document.getElementById('mario-kart-rank-list');
+            const marioKartModalError = document.getElementById('mario-kart-modal-error');
+            const mkModalCancelBtn = document.getElementById('mk-modal-cancel');
+            const mkModalConfirmBtn = document.getElementById('mk-modal-confirm');
+
+            // --- EVENT LISTENERS ---
+            addParticipantBtn.addEventListener('click', addOrUpdateParticipant);
+            participantNameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') addOrUpdateParticipant();
+            });
+            generateBracketBtn.addEventListener('click', generateTournament);
+            loadTournamentBtn.addEventListener('click', loadTournament);
+            resetButton.addEventListener('click', resetTournament);
+            newTournamentBtn.addEventListener('click', resetTournament);
+            saveProgressBtn.addEventListener('click', () => saveTournament(true));
+            exportImageBtn.addEventListener('click', () => exportAsImage(bracketContainer, `${tournamentData.name || 'bracket'}-progress`));
+            exportFinalResultsBtn.addEventListener('click', exportCombinedResults);
+            modalCancelBtn.addEventListener('click', closeScoreModal);
+            modalConfirmBtn.addEventListener('click', confirmScore);
+            mkModalCancelBtn.addEventListener('click', closeMarioKartModal);
+            mkModalConfirmBtn.addEventListener('click', confirmMarioKartRanks);
+            tournamentTypeRadios.forEach(radio => radio.addEventListener('change', handleFormatChange));
+
+            // --- INITIALIZATION ---
+            checkForSavedTournament();
+            pickNextColor();
+            handleFormatChange();
+
+
+            // --- FUNCTIONS ---
+
+            function addOrUpdateParticipant() {
+                const name = participantNameInput.value.trim();
+                const color = participantColorInput.value;
+                if (!name) return;
+
+                if (editingParticipantId !== null) {
+                    const participant = participants.find(p => p.id === editingParticipantId);
+                    if (participant) {
+                        participant.name = name;
+                        participant.color = color;
+                    }
+                    cancelEdit();
+                } else {
+                    if (!participants.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+                        participants.push({ id: participants.length + 1, name, color });
+                        pickNextColor();
+                    }
+                }
+                participantNameInput.value = '';
+                participantNameInput.focus();
+                renderParticipants();
+            }
+            
+            function checkForSavedTournament() {
+                if (localStorage.getItem('tournamentProgress')) {
+                    loadTournamentBtn.classList.remove('hidden');
+                } else {
+                    loadTournamentBtn.classList.add('hidden');
+                }
+            }
+            
+            function handleFormatChange() {
+                const selectedType = document.querySelector('input[name="tournament"]:checked').value;
+                if (selectedType === 'single') {
+                    thirdPlaceOption.style.display = 'flex';
+                } else {
+                    thirdPlaceOption.style.display = 'none';
+                    thirdPlaceCheckbox.checked = false;
+                }
+
+                if (selectedType === 'mario-kart') {
+                    marioKartRoundsContainer.classList.remove('hidden');
+                    enableScoringCheckbox.checked = true;
+                    enableScoringCheckbox.disabled = true;
+                    enableScoringCheckbox.parentElement.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    marioKartRoundsContainer.classList.add('hidden');
+                    enableScoringCheckbox.disabled = false;
+                    enableScoringCheckbox.parentElement.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
+            
+            function pickNextColor() {
+                const usedColors = participants.map(p => p.color);
+                const unusedColors = availableColors.filter(c => !usedColors.includes(c));
+                if (unusedColors.length > 0) {
+                    participantColorInput.value = unusedColors[Math.floor(Math.random() * unusedColors.length)];
+                } else {
+                    participantColorInput.value = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+                }
+            }
+
+            function startEdit(id) {
+                const participant = participants.find(p => p.id === id);
+                if (!participant) return;
+
+                editingParticipantId = id;
+                participantNameInput.value = participant.name;
+                participantColorInput.value = participant.color;
+                
+                const addEditButtons = document.getElementById('add-edit-buttons');
+                addEditButtons.innerHTML = `
+                    <button id="update-participant" class="w-2/3 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition">Update</button>
+                    <button id="cancel-edit" class="w-1/3 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition">Cancel</button>
+                `;
+                document.getElementById('update-participant').addEventListener('click', addOrUpdateParticipant);
+                document.getElementById('cancel-edit').addEventListener('click', cancelEdit);
+            }
+            
+            function cancelEdit() {
+                editingParticipantId = null;
+                participantNameInput.value = '';
+                const addEditButtons = document.getElementById('add-edit-buttons');
+                addEditButtons.innerHTML = `<button id="add-participant" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Add Participant</button>`;
+                document.getElementById('add-participant').addEventListener('click', addOrUpdateParticipant);
+                pickNextColor();
+            }
+
+            function removeParticipant(id) {
+                participants = participants.filter(p => p.id !== id);
+                if (editingParticipantId === id) {
+                    cancelEdit();
+                }
+                renderParticipants();
+                pickNextColor();
+            }
+
+            function renderParticipants() {
+                participantsListDiv.innerHTML = '';
+                participants.forEach(p => {
+                    const participantEl = document.createElement('div');
+                    participantEl.className = 'flex items-center justify-between bg-gray-800 p-2 rounded-lg';
+                    participantEl.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <div class="w-4 h-4 rounded-full" style="background-color: ${p.color};"></div>
+                            <span class="text-white">${p.name}</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="text-gray-400 hover:text-white" title="Edit">✏️</button>
+                            <button class="text-red-400 hover:text-red-500 font-bold" title="Remove">&times;</button>
+                        </div>
+                    `;
+                    participantEl.querySelector('button[title="Edit"]').addEventListener('click', () => startEdit(p.id));
+                    participantEl.querySelector('button[title="Remove"]').addEventListener('click', () => removeParticipant(p.id));
+                    participantsListDiv.appendChild(participantEl);
+                });
+            }
+            
+            function showConfetti(x, y) {
+                for (let i = 0; i < 30; i++) {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.left = `${x}px`;
+                    confetti.style.top = `${y}px`;
+                    confetti.style.backgroundColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+                    const spreadX = Math.random() * 200 - 100;
+                    const spreadY = Math.random() * 150 - 120;
+                    confetti.style.transform = `translate(${spreadX}px, ${spreadY}px) rotate(${Math.random() * 360}deg)`;
+                    document.body.appendChild(confetti);
+                    setTimeout(() => confetti.remove(), 1000);
+                }
+            }
+
+            function generateTournament() {
+                if (participants.length < 2) return;
+                
+                const type = document.querySelector('input[name="tournament"]:checked').value;
+                scoringEnabled = type === 'mario-kart' || enableScoringCheckbox.checked;
+                const name = tournamentNameInput.value.trim() || 'Office Tournament';
+                const includeThirdPlace = thirdPlaceCheckbox.checked;
+                
+                setupScreen.classList.add('hidden');
+                tournamentView.classList.remove('hidden');
+
+                const shuffledParticipants = [...participants].sort(() => Math.random() - 0.5);
+
+                switch (type) {
+                    case 'single':
+                        tournamentTitle.textContent = name;
+                        generateSingleElimination(shuffledParticipants, name, includeThirdPlace);
+                        break;
+                    case 'double':
+                        tournamentTitle.textContent = name;
+                        generateDoubleElimination(shuffledParticipants, name);
+                        break;
+                    case 'round-robin':
+                        tournamentTitle.textContent = name;
+                        generateRoundRobin(shuffledParticipants, name);
+                        break;
+                    case 'mario-kart':
+                        tournamentTitle.textContent = name;
+                        const rounds = parseInt(marioKartRoundsInput.value) || 1;
+                        generateMarioKart(shuffledParticipants, name, rounds);
+                        break;
+                }
+            }
+            
+            function createMatch(p1, p2) {
+                return { p1, p2, winner: null, p1_score: null, p2_score: null };
+            }
+
+            function generateSingleElimination(players, name, includeThirdPlace) {
+                const totalPlayers = players.length;
+                const rounds = Math.ceil(Math.log2(totalPlayers));
+                const bracketSize = Math.pow(2, rounds);
+                const byes = bracketSize - totalPlayers;
+                
+                tournamentData = { type: 'single', name, players, rounds: [], thirdPlaceMatch: null };
+                if (includeThirdPlace && players.length >= 4) {
+                    tournamentData.thirdPlaceMatch = createMatch(null, null);
+                }
+
+                let playersWithByes = players.slice(0, byes).map(p => ({ ...p, isBye: true }));
+                let playersInMatches = players.slice(byes);
+                
+                let matches = [];
+                for (let i = 0; i < playersInMatches.length; i += 2) {
+                    matches.push(createMatch(playersInMatches[i], playersInMatches[i+1]));
+                }
+
+                tournamentData.rounds.push({ matches: matches, byes: playersWithByes });
+
+                for (let i = 1; i < rounds; i++) {
+                    const numMatches = Math.pow(2, rounds - 1 - i);
+                    tournamentData.rounds.push({ matches: Array.from({ length: numMatches }, () => createMatch(null, null)) });
+                }
+
+                renderBracket();
+            }
+
+            function generateDoubleElimination(players, name) {
+                const totalPlayers = players.length;
+                const rounds = Math.ceil(Math.log2(totalPlayers));
+                const bracketSize = Math.pow(2, rounds);
+
+                tournamentData = { type: 'double', name, players, winnersBracket: [], losersBracket: [] };
+                
+                let firstRoundPlayers = [...players];
+                while(firstRoundPlayers.length < bracketSize) {
+                    firstRoundPlayers.push({ name: 'BYE', isBye: true, color: '#4b5563' });
+                }
+
+                let matches = [];
+                for (let i = 0; i < firstRoundPlayers.length; i += 2) {
+                    matches.push(createMatch(firstRoundPlayers[i], firstRoundPlayers[i+1]));
+                }
+                tournamentData.winnersBracket.push({ matches });
+                
+                for (let i = 1; i < rounds; i++) {
+                    const numMatches = Math.pow(2, rounds - 1 - i);
+                    tournamentData.winnersBracket.push({ matches: Array.from({ length: numMatches }, () => createMatch(null, null)) });
+                }
+
+                for (let i = 0; i < (2 * rounds - 1); i++) {
+                     tournamentData.losersBracket.push({ matches: [] });
+                }
+                
+                tournamentData.grandFinals = { matches: [createMatch(null, null)] };
+
+                renderBracket();
+            }
+            
+            function generateRoundRobin(players, name) {
+                let matches = [];
+                for(let i = 0; i < players.length; i++) {
+                    for(let j = i + 1; j < players.length; j++) {
+                        matches.push(createMatch(players[i], players[j]));
+                    }
+                }
+                
+                let stats = {};
+                players.forEach(p => {
+                    stats[p.name] = { wins: 0, pointsFor: 0, pointsAgainst: 0, diff: 0 };
+                });
+
+                tournamentData = { type: 'round-robin', name, players, matches, stats };
+                renderBracket();
+            }
+
+            function generateMarioKart(players, name, totalRounds) {
+                let stats = {};
+                players.forEach(p => {
+                    stats[p.name] = { totalPoints: 0, rounds: Array(totalRounds).fill(null) };
+                });
+
+                tournamentData = { type: 'mario-kart', name, players, totalRounds, stats, completedRounds: 0 };
+                renderBracket();
+            }
+            
+            function renderBracket() {
+                bracketContainer.innerHTML = '';
+                if (tournamentData.type === 'single') renderSingleEliminationBracket();
+                if (tournamentData.type === 'double') renderDoubleEliminationBracket();
+                if (tournamentData.type === 'round-robin') renderRoundRobinView();
+                if (tournamentData.type === 'mario-kart') renderMarioKartView();
+                
+                setTimeout(processByes, 100);
+            }
+
+            function createPlayerElement(player, match, isClickable = false, matchId = '') {
+                if (!player || player.isBye) {
+                    return `<div class="flex-1 text-gray-500 italic p-3">${player ? player.name : 'TBD'}</div>`;
+                }
+                const isWinner = match.winner?.name === player.name;
+                const score = player.name === match.p1?.name ? match.p1_score : match.p2_score;
+                const hasScore = score !== null && score !== undefined;
+                const clickableAttrs = isClickable ? `data-winner="${player.name}" data-match-id="${matchId}"` : '';
+                const clickableClasses = isClickable ? 'cursor-pointer hover:bg-gray-600' : '';
+
+                return `
+                    <div class="player-block flex-1 flex justify-between items-center p-3 rounded-md transition ${clickableClasses}" ${clickableAttrs} style="border-left: 4px solid ${player.color}; background-color: #374151;">
+                        <span class="pointer-events-none ${isWinner ? 'font-bold text-green-400' : 'font-semibold'}">${player.name}</span>
+                        ${hasScore ? `<span class="pointer-events-none font-bold text-xl ${isWinner ? 'text-white' : 'text-gray-400'}">${score}</span>` : ''}
+                    </div>
+                `;
+            }
+
+            function createMatchupElement(match, matchId, isFinal, title = '') {
+                const matchupEl = document.createElement('div');
+                matchupEl.className = 'relative matchup bg-gray-800/50 p-2 rounded-lg';
+                
+                const isUndecided = !match.winner && match.p1 && match.p2 && !match.p1.isBye && !match.p2.isBye;
+                let buttonHtml = '';
+                if (isUndecided && scoringEnabled) {
+                    buttonHtml = `<button data-match-id="${matchId}" class="score-btn w-full mt-2 bg-gray-600 text-white font-bold rounded-md hover:bg-green-500 transition py-1 text-sm">Enter Score</button>`;
+                }
+
+                const isClickable = !scoringEnabled && isUndecided;
+
+                matchupEl.innerHTML = `
+                    ${title ? `<h4 class="text-center text-xs text-gray-400 mb-1">${title}</h4>` : ''}
+                    <div class="flex flex-col gap-2 relative">
+                        ${createPlayerElement(match.p1, match, isClickable, matchId)}
+                        ${createPlayerElement(match.p2, match, isClickable, matchId)}
+                    </div>
+                    ${buttonHtml}
+                    ${!isFinal ? `<div class="matchup-connector"><div class="connector-line"></div></div>` : ''}
+                `;
+                return matchupEl;
+            };
+
+            function renderSingleEliminationBracket() {
+                const bracketEl = document.createElement('div');
+                bracketEl.className = 'flex gap-12 items-start';
+                
+                const roundElements = [];
+
+                // Round 1
+                const round1El = document.createElement('div');
+                round1El.className = 'flex flex-col gap-6 w-56 space-y-12 py-6';
+                round1El.innerHTML = `<h3 class="text-center font-bold text-lg mb-4">Round 1</h3>`;
+                tournamentData.rounds[0].byes.forEach(player => {
+                    round1El.appendChild(createMatchupElement({ p1: player, p2: {name: 'BYE', isBye: true}, winner: player }, '', false));
+                });
+                tournamentData.rounds[0].matches.forEach((match, matchIndex) => {
+                    round1El.appendChild(createMatchupElement(match, `0-${matchIndex}`, false));
+                });
+                roundElements.push(round1El);
+
+                // Subsequent rounds
+                tournamentData.rounds.slice(1).forEach((round, roundIndex) => {
+                    const actualRoundIndex = roundIndex + 1;
+                    const roundEl = document.createElement('div');
+                    const isFinal = actualRoundIndex === tournamentData.rounds.length - 1;
+                    const roundTitle = isFinal ? 'Finals' : `Round ${actualRoundIndex + 1}`;
+                    roundEl.className = `flex flex-col gap-6 w-56 space-y-24 py-16 round`;
+                    roundEl.innerHTML = `<h3 class="text-center font-bold text-lg mb-4">${roundTitle}</h3>`;
+                    
+                    round.matches.forEach((match, matchIndex) => {
+                        roundEl.appendChild(createMatchupElement(match, `${actualRoundIndex}-${matchIndex}`, isFinal));
+                    });
+                    roundElements.push(roundEl);
+                });
+
+                // 3rd place match element
+                let thirdPlaceEl = null;
+                if (tournamentData.thirdPlaceMatch) {
+                    thirdPlaceEl = document.createElement('div');
+                    thirdPlaceEl.className = 'flex flex-col gap-6 w-56 py-16';
+                    thirdPlaceEl.innerHTML = `<h3 class="text-center font-bold text-lg mb-4">3rd Place Match</h3>`;
+                    thirdPlaceEl.appendChild(createMatchupElement(tournamentData.thirdPlaceMatch, '3rd-0', true));
+                }
+                
+                // Append elements in correct order
+                const finalRoundEl = roundElements.pop(); // Take final round off the end
+                roundElements.forEach(el => bracketEl.appendChild(el)); // Append all early rounds
+                if (thirdPlaceEl) {
+                    bracketEl.appendChild(thirdPlaceEl); // Append 3rd place match before final
+                }
+                bracketEl.appendChild(finalRoundEl); // Append final round last
+
+                bracketContainer.appendChild(bracketEl);
+                addWinButtonListeners();
+            }
+
+            function renderDoubleEliminationBracket() {
+                bracketContainer.innerHTML = `<h2 class="text-2xl text-center text-red-500">Double Elimination view is under construction.</h2>`;
+            }
+
+            function renderRoundRobinView() {
+                bracketContainer.innerHTML = `<h2 class="text-2xl text-center text-red-500">Round Robin view is under construction.</h2>`;
+            }
+
+            function renderMarioKartView() {
+                const container = document.createElement('div');
+                container.className = 'max-w-4xl mx-auto';
+                
+                let header = `<div class="grid grid-cols-3 md:grid-cols-4 gap-4 p-2 font-bold bg-gray-800 rounded-t-lg">
+                    <div class="col-span-1 md:col-span-2">Player</div>
+                    <div class="text-center">Total Points</div>
+                    <div class="text-center">Actions</div>
+                </div>`;
+                container.innerHTML = header;
+
+                const sortedPlayers = [...tournamentData.players].sort((a,b) => tournamentData.stats[b.name].totalPoints - tournamentData.stats[a.name].totalPoints);
+
+                const list = document.createElement('div');
+                list.className = 'bg-gray-800/50 rounded-b-lg';
+                sortedPlayers.forEach(p => {
+                    const playerStats = tournamentData.stats[p.name];
+                    const row = document.createElement('div');
+                    row.className = 'grid grid-cols-3 md:grid-cols-4 gap-4 p-3 items-center border-b border-gray-700 last:border-b-0';
+                    row.innerHTML = `
+                        <div class="col-span-1 md:col-span-2 flex items-center gap-3">
+                            <div class="w-4 h-4 rounded-full flex-shrink-0" style="background-color: ${p.color};"></div>
+                            <span class="font-semibold">${p.name}</span>
+                        </div>
+                        <div class="text-center text-2xl font-bold">${playerStats.totalPoints}</div>
+                        <div class="text-center" id="actions-${p.id}"></div>
+                    `;
+                    list.appendChild(row);
+                });
+                container.appendChild(list);
+
+                bracketContainer.appendChild(container);
+
+                if (tournamentData.completedRounds < tournamentData.totalRounds) {
+                    const actionCell = container.querySelector(`#actions-${tournamentData.players[0].id}`);
+                    const roundButton = document.createElement('button');
+                    roundButton.textContent = `Enter Ranks for Round ${tournamentData.completedRounds + 1}`;
+                    roundButton.className = 'col-span-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition';
+                    roundButton.dataset.roundIndex = tournamentData.completedRounds;
+                    roundButton.addEventListener('click', () => openMarioKartModal(tournamentData.completedRounds));
+                    
+                    const actionContainer = document.createElement('div');
+                    actionContainer.className = 'col-span-4 text-center py-4';
+                    actionContainer.appendChild(roundButton);
+                    list.appendChild(actionContainer);
+                }
+            }
+
+            function findMatchById(matchId) {
+                const parts = matchId.split('-');
+                let match;
+                if (parts[0] === 'w' || parts[0] === 'l' || parts[0] === 'f') {
+                    const bracket = parts[0]; const roundIndex = parseInt(parts[1]); const matchIndex = parseInt(parts[2]);
+                    if (bracket === 'w') match = tournamentData.winnersBracket[roundIndex].matches[matchIndex];
+                    else if (bracket === 'l') match = tournamentData.losersBracket[roundIndex].matches[matchIndex];
+                    else if (bracket === 'f') match = tournamentData.grandFinals.matches[matchIndex];
+                } else if (parts[0] === 'rr') {
+                    const matchIndex = parseInt(parts[1]); match = tournamentData.matches[matchIndex];
+                } else if (parts[0] === '3rd') {
+                    match = tournamentData.thirdPlaceMatch;
+                }
+                else {
+                    const roundIndex = parseInt(parts[0]); const matchIndex = parseInt(parts[1]);
+                    match = tournamentData.rounds[roundIndex].matches[matchIndex];
+                }
+                return match;
+            }
+
+            function openScoreModal(matchId) {
+                currentMatchIdForModal = matchId;
+                const match = findMatchById(matchId);
+                if (!match || !match.p1 || !match.p2) return;
+
+                modalP1Name.textContent = match.p1.name;
+                modalP2Name.textContent = match.p2.name;
+                p1ScoreInput.value = '';
+                p2ScoreInput.value = '';
+                scoreModal.classList.remove('hidden');
+                p1ScoreInput.focus();
+            }
+
+            function closeScoreModal() {
+                currentMatchIdForModal = null;
+                scoreModal.classList.add('hidden');
+            }
+
+            function confirmScore() {
+                const score1 = parseInt(p1ScoreInput.value);
+                const score2 = parseInt(p2ScoreInput.value);
+
+                if (isNaN(score1) || isNaN(score2) || score1 < 0 || score2 < 0 || score1 === score2) {
+                    return;
+                }
+
+                const match = findMatchById(currentMatchIdForModal);
+                const winnerName = score1 > score2 ? match.p1.name : match.p2.name;
+                const scores = { p1_score: score1, p2_score: score2 };
+                
+                const originalButton = document.querySelector(`.score-btn[data-match-id="${currentMatchIdForModal}"]`);
+                if (originalButton) {
+                    const rect = originalButton.getBoundingClientRect();
+                    showConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                } else {
+                    showConfetti(window.innerWidth / 2, window.innerHeight / 2);
+                }
+
+                processWin(winnerName, currentMatchIdForModal, scores);
+                closeScoreModal();
+            }
+
+            function openMarioKartModal(roundIndex) {
+                marioKartModalTitle.textContent = `Enter Ranks for Round ${roundIndex + 1}`;
+                marioKartModalError.textContent = '';
+                marioKartRankList.innerHTML = '';
+                mkModalConfirmBtn.dataset.roundIndex = roundIndex;
+
+                tournamentData.players.forEach(p => {
+                    const rankInputEl = document.createElement('div');
+                    rankInputEl.className = 'flex items-center justify-between';
+                    rankInputEl.innerHTML = `
+                        <label for="rank-${p.id}" class="text-lg font-semibold text-white flex items-center gap-3">
+                            <div class="w-4 h-4 rounded-full" style="background-color: ${p.color};"></div>
+                            ${p.name}
+                        </label>
+                        <input type="number" id="rank-${p.id}" data-player-name="${p.name}" min="1" max="${tournamentData.players.length}" class="mario-kart-rank-input w-20 bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-center focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    `;
+                    marioKartRankList.appendChild(rankInputEl);
+                });
+
+                marioKartModal.classList.remove('hidden');
+            }
+
+            function closeMarioKartModal() {
+                marioKartModal.classList.add('hidden');
+            }
+
+            function confirmMarioKartRanks(e) {
+                const roundIndex = parseInt(e.currentTarget.dataset.roundIndex);
+                const rankInputs = document.querySelectorAll('.mario-kart-rank-input');
+                const ranks = new Map();
+                let isValid = true;
+                let error = '';
+
+                rankInputs.forEach(input => {
+                    const rank = parseInt(input.value);
+                    const name = input.dataset.playerName;
+                    if (isNaN(rank) || rank < 1 || rank > tournamentData.players.length) {
+                        isValid = false;
+                        error = 'All ranks must be between 1 and ' + tournamentData.players.length;
+                    }
+                    if (ranks.has(rank)) {
+                        isValid = false;
+                        error = 'Duplicate ranks are not allowed.';
+                    }
+                    ranks.set(rank, name);
+                });
+
+                if (ranks.size !== tournamentData.players.length) {
+                    isValid = false;
+                    error = 'Please enter a rank for every player.';
+                }
+                
+                if (!isValid) {
+                    marioKartModalError.textContent = error;
+                    return;
+                }
+
+                const pointSystem = [15, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+                ranks.forEach((name, rank) => {
+                    const points = pointSystem[rank - 1] || 0;
+                    tournamentData.stats[name].rounds[roundIndex] = { rank, points };
+                    tournamentData.stats[name].totalPoints += points;
+                });
+
+                tournamentData.completedRounds++;
+                
+                if (tournamentData.completedRounds === tournamentData.totalRounds) {
+                     const finalWinner = calculateAndDisplayRankings(null, true);
+                     showVictory(finalWinner);
+                } else {
+                    renderBracket();
+                }
+
+                closeMarioKartModal();
+            }
+            
+            function addWinButtonListeners() {
+                // For non-scoring mode (clickable player names)
+                document.querySelectorAll('.player-block[data-winner]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const target = e.currentTarget;
+                        const winnerName = target.dataset.winner;
+                        const matchId = target.dataset.matchId;
+                        showConfetti(e.clientX, e.clientY);
+                        processWin(winnerName, matchId, null);
+                    });
+                });
+
+                // For scoring mode ("Enter Score" button)
+                document.querySelectorAll('.score-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const target = e.currentTarget;
+                        const matchId = target.dataset.matchId;
+                        openScoreModal(matchId);
+                    });
+                });
+            }
+
+            function processWin(winnerName, matchId, scores = null) {
+                const match = findMatchById(matchId);
+
+                if (match && !match.winner) {
+                    const winner = match.p1.name === winnerName ? match.p1 : match.p2;
+                    const loser = match.p1.name === winnerName ? match.p2 : match.p1;
+                    match.winner = winner;
+
+                    if (scoringEnabled && scores) {
+                        match.p1_score = scores.p1_score;
+                        match.p2_score = scores.p2_score;
+                    }
+
+                    if (tournamentData.type === 'single') {
+                        const parts = matchId.split('-');
+                        advanceSingle(winner, loser, parseInt(parts[0]), parseInt(parts[1]));
+                    } else if (tournamentData.type === 'double') {
+                        const parts = matchId.split('-');
+                        advanceDouble(winner, loser, parts[0], parseInt(parts[1]), parseInt(parts[2]));
+                    } else if (tournamentData.type === 'round-robin') {
+                        if (tournamentData.matches.every(m => m.winner)) {
+                            const finalWinner = calculateAndDisplayRankings(null, true);
+                            showVictory(finalWinner);
+                        }
+                    }
+                }
+                
+                renderBracket();
+            }
+
+            function advanceSingle(winner, loser, roundIndex, matchIndex) {
+                 if (roundIndex >= tournamentData.rounds.length - 1) {
+                    showVictory(winner);
+                    return;
+                }
+
+                if (tournamentData.thirdPlaceMatch && roundIndex === tournamentData.rounds.length - 2) { // Semifinals
+                    if (tournamentData.thirdPlaceMatch.p1 === null) {
+                        tournamentData.thirdPlaceMatch.p1 = loser;
+                    } else {
+                        tournamentData.thirdPlaceMatch.p2 = loser;
+                    }
+                }
+
+                const nextRoundIndex = roundIndex + 1;
+                const nextMatchIndex = Math.floor(matchIndex / 2);
+                const nextMatch = tournamentData.rounds[nextRoundIndex].matches[nextMatchIndex];
+                
+                if (!nextMatch.p1) nextMatch.p1 = winner; else nextMatch.p2 = winner;
+            }
+
+            function advanceDouble(winner, loser, bracket, roundIndex, matchIndex) {
+                 if (bracket === 'f') { showVictory(winner); return; }
+                 // Simplified logic for brevity
+            }
+
+            function processByes() {
+                if (tournamentData.type === 'single') {
+                    const byes = tournamentData.rounds[0].byes;
+                    if (!byes.length) return;
+                    let processed = false;
+                    let nextMatchIndexOffset = tournamentData.rounds[0].matches.length;
+                    byes.forEach((player, byeIndex) => {
+                        const nextRoundIndex = 1;
+                        const nextMatchIndex = Math.floor((nextMatchIndexOffset + byeIndex) / 2);
+                        const nextMatch = tournamentData.rounds[nextRoundIndex].matches[nextMatchIndex];
+                        if (!nextMatch.p1) { nextMatch.p1 = player; processed = true; }
+                        else if (!nextMatch.p2) { nextMatch.p2 = player; processed = true; }
+                    });
+                     if (processed) renderBracket();
+                }
+                
+                if (tournamentData.type === 'double') {
+                    let processed = false;
+                     tournamentData.winnersBracket[0].matches.forEach((match, matchIndex) => {
+                         if(match.p1?.isBye && !match.winner) { processWin(match.p2.name, `w-0-${matchIndex}`); processed = true; }
+                         else if (match.p2?.isBye && !match.winner) { processWin(match.p1.name, `w-0-${matchIndex}`); processed = true; }
+                     });
+                     if(processed) renderBracket();
+                }
+            }
+            
+            function calculateAndDisplayRankings(winner, returnWinner = false) {
+                let stats = {};
+                participants.forEach(p => {
+                    stats[p.name] = { wins: 0, pointsFor: 0, pointsAgainst: 0, diff: 0 };
+                });
+
+                const processMatchStats = (match) => {
+                    if (!match || !match.winner || match.winner.isBye) return;
+                    stats[match.winner.name].wins++;
+                    if (scoringEnabled && match.p1_score !== null && match.p2_score !== null) {
+                        if (match.p1 && !match.p1.isBye) {
+                            stats[match.p1.name].pointsFor += match.p1_score;
+                            stats[match.p1.name].pointsAgainst += match.p2_score;
+                        }
+                        if (match.p2 && !match.p2.isBye) {
+                            stats[match.p2.name].pointsFor += match.p2_score;
+                            stats[match.p2.name].pointsAgainst += match.p1_score;
+                        }
+                    }
+                };
+
+                const processBracketStats = (bracket) => {
+                    bracket.forEach(round => round.matches.forEach(processMatchStats));
+                };
+
+                if (tournamentData.type === 'single') {
+                    processBracketStats(tournamentData.rounds);
+                    if (tournamentData.thirdPlaceMatch) processMatchStats(tournamentData.thirdPlaceMatch);
+                } else if (tournamentData.type === 'double') {
+                    processBracketStats(tournamentData.winnersBracket);
+                    processBracketStats(tournamentData.losersBracket);
+                    processMatchStats(tournamentData.grandFinals.matches[0]);
+                } else if (tournamentData.type === 'round-robin') {
+                    tournamentData.matches.forEach(processMatchStats);
+                } else if (tournamentData.type === 'mario-kart') {
+                    participants.forEach(p => {
+                        stats[p.name].wins = tournamentData.stats[p.name].totalPoints;
+                    });
+                }
+
+
+                Object.values(stats).forEach(s => s.diff = s.pointsFor - s.pointsAgainst);
+
+                const sortedParticipants = [...participants].sort((a, b) => {
+                    const statsA = stats[a.name];
+                    const statsB = stats[b.name];
+                    if (statsA.wins !== statsB.wins) return statsB.wins - statsA.wins;
+                    if (scoringEnabled && tournamentData.type !== 'mario-kart') return statsB.diff - statsA.diff;
+                    return 0;
+                });
+                
+                if (returnWinner) {
+                    return sortedParticipants[0];
+                }
+
+                victoryRankingsList.innerHTML = `<h2 class="text-3xl font-bold text-center text-white mb-6">Final Rankings</h2>`;
+                let lastStats = { wins: -1, diff: -Infinity };
+                let currentRank = 0;
+
+                sortedParticipants.forEach((p, index) => {
+                    const pStats = stats[p.name];
+                    if (pStats.wins !== lastStats.wins || (scoringEnabled && pStats.diff !== lastStats.diff)) {
+                        currentRank = index + 1;
+                    }
+                    lastStats = pStats;
+                    const isWinner = winner && (p.name === winner.name);
+                    const rankEl = document.createElement('div');
+                    rankEl.className = `flex items-center p-3 rounded-lg my-2 mx-4 ${isWinner ? 'bg-yellow-500/30 scale-110' : 'bg-gray-800'}`;
+                    
+                    let statsText;
+                    if (tournamentData.type === 'mario-kart') {
+                        statsText = `${tournamentData.stats[p.name].totalPoints} Points`;
+                    } else {
+                        const winsText = `${pStats.wins} Win${pStats.wins === 1 ? '' : 's'}`;
+                        const diffText = scoringEnabled ? `<span class="font-normal text-gray-400 text-sm">(Diff: ${pStats.diff > 0 ? '+' : ''}${pStats.diff})</span>` : '';
+                        statsText = `${winsText} ${diffText}`;
+                    }
+
+
+                    rankEl.innerHTML = `
+                        <span class="text-xl font-bold w-10 ${isWinner ? 'text-yellow-300' : 'text-gray-400'}">${currentRank}</span>
+                        <div class="w-4 h-4 rounded-full" style="background-color: ${p.color};"></div>
+                        <span class="ml-4 text-lg ${isWinner ? 'font-extrabold text-white text-2xl' : 'font-semibold'}">${p.name}</span>
+                        <span class="ml-auto font-bold text-blue-300 flex items-center gap-2">${statsText}</span>
+                    `;
+                    victoryRankingsList.appendChild(rankEl);
+                });
+                
+                victoryRankingsContainer.style.opacity = '1';
+                setTimeout(() => {
+                    if (victoryRankingsList.scrollHeight > victoryRankingsList.parentElement.clientHeight) {
+                        victoryRankingsList.classList.add('scrolling-list');
+                    }
+                }, 100);
+            }
+
+            function showVictory(winner) {
+                winnerNameEl.textContent = winner.name;
+                winnerNameEl.style.color = winner.color;
+                victoryTournamentNameEl.textContent = `--- ${tournamentData.name} ---`;
+                app.style.opacity = '0';
+                
+                setTimeout(() => {
+                    app.classList.add('hidden');
+                    victoryScreen.classList.remove('hidden');
+                    victoryMainContent.style.opacity = '1';
+                    victoryRankingsContainer.style.opacity = '0';
+                }, 500);
+
+                setTimeout(() => {
+                    victoryMainContent.style.opacity = '0';
+                    calculateAndDisplayRankings(winner);
+                }, 10000);
+            }
+            
+            function saveTournament(showConfirmation = false) {
+                const tournamentState = {
+                    participants,
+                    tournamentData,
+                    scoringEnabled,
+                    isMarioKart: document.querySelector('input[name="tournament"]:checked').value === 'mario-kart',
+                    marioKartRounds: marioKartRoundsInput.value,
+                    tournamentName: tournamentNameInput.value
+                };
+                localStorage.setItem('tournamentProgress', JSON.stringify(tournamentState));
+                if (showConfirmation) {
+                    saveProgressBtn.textContent = 'Saved!';
+                    setTimeout(() => { saveProgressBtn.textContent = 'Save Progress'; }, 2000);
+                }
+            }
+
+            function loadTournament() {
+                const savedState = JSON.parse(localStorage.getItem('tournamentProgress'));
+                if (savedState) {
+                    participants = savedState.participants;
+                    tournamentData = savedState.tournamentData;
+                    scoringEnabled = savedState.scoringEnabled;
+                    tournamentNameInput.value = savedState.tournamentName || '';
+                    if (savedState.isMarioKart) {
+                        document.querySelector('input[name="tournament"][value="mario-kart"]').checked = true;
+                        marioKartRoundsInput.value = savedState.marioKartRounds;
+                    }
+                    handleFormatChange();
+                    
+                    setupScreen.classList.add('hidden');
+                    tournamentView.classList.remove('hidden');
+                    tournamentTitle.textContent = tournamentData.name;
+                    renderBracket();
+                }
+            }
+
+            async function exportCombinedResults() {
+                // 1. Create a temporary container
+                const tempExportContainer = document.createElement('div');
+                tempExportContainer.style.position = 'absolute';
+                tempExportContainer.style.left = '-9999px'; // Position off-screen
+                tempExportContainer.style.width = '1200px'; // Set a fixed width for consistent export
+                tempExportContainer.style.padding = '20px';
+                tempExportContainer.style.backgroundColor = '#111827';
+                tempExportContainer.style.color = '#f3f4f6';
+                document.body.appendChild(tempExportContainer);
+
+                // 2. Add Title
+                const titleEl = document.createElement('h1');
+                titleEl.textContent = tournamentData.name || 'Tournament Results';
+                titleEl.className = 'text-4xl font-bold text-center text-white mb-8';
+                tempExportContainer.appendChild(titleEl);
+
+                // 3. Clone and append bracket if it's not a Mario Kart tournament
+                if (tournamentData.type !== 'mario-kart') {
+                    const bracketTitle = document.createElement('h2');
+                    bracketTitle.textContent = 'Final Bracket';
+                    bracketTitle.className = 'text-2xl font-bold text-white mb-4';
+                    tempExportContainer.appendChild(bracketTitle);
+                    
+                    const finalBracketClone = bracketContainer.cloneNode(true);
+                    finalBracketClone.style.overflowX = 'visible'; 
+                    tempExportContainer.appendChild(finalBracketClone);
+                }
+
+                // 4. Clone and append rankings
+                const rankingsTitle = document.createElement('h2');
+                rankingsTitle.textContent = 'Final Rankings';
+                rankingsTitle.className = 'text-2xl font-bold text-white mt-8 mb-4';
+                tempExportContainer.appendChild(rankingsTitle);
+                
+                const finalRankingsClone = document.getElementById('rankings-export-area').cloneNode(true);
+                finalRankingsClone.style.height = 'auto'; // Let it take up its natural height
+                finalRankingsClone.querySelector('#victory-rankings-list').classList.remove('scrolling-list');
+                finalRankingsClone.querySelector('#victory-rankings-list').style.position = 'static';
+                tempExportContainer.appendChild(finalRankingsClone);
+
+                // 5. Use html2canvas
+                await exportAsImage(tempExportContainer, `${tournamentData.name || 'bracket'}-final-results`);
+                
+                // 6. Clean up
+                document.body.removeChild(tempExportContainer);
+            }
+
+            function exportAsImage(element, filename) {
+                const originalBg = element.style.backgroundColor;
+                element.style.backgroundColor = '#111827'; // Ensure background for export
+                html2canvas(element, { 
+                    allowTaint: true,
+                    useCORS: true,
+                    scrollX: 0,
+                    scrollY: -window.scrollY
+                }).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = `${filename}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    element.style.backgroundColor = originalBg; // Reset background
+                });
+            }
+
+            function resetTournament() {
+                participants = [];
+                tournamentData = {};
+                renderParticipants();
+                pickNextColor();
+                tournamentNameInput.value = '';
+                enableScoringCheckbox.checked = false;
+                thirdPlaceCheckbox.checked = false;
+                localStorage.removeItem('tournamentProgress');
+                checkForSavedTournament();
+                
+                if (!victoryScreen.classList.contains('hidden')) {
+                     victoryScreen.classList.add('hidden');
+                     victoryRankingsList.classList.remove('scrolling-list');
+                     victoryRankingsList.innerHTML = '';
+                     app.classList.remove('hidden');
+                     setTimeout(() => { app.style.opacity = '1'; }, 50);
+                }
+
+                setupScreen.classList.remove('hidden');
+                tournamentView.classList.add('hidden');
+            }
+        });
+    </script>
+
+</body>
+</html>
+
